@@ -2,6 +2,9 @@
 
 (require racket/contract)
 
+;;; TODO: measure performance change with complex formatting of
+;;; capturing arguments and not running 'format' except to update.
+
 (provide
   (contract-out
     [update-meter (->* [string?] [#:force boolean?] #:rest any/c any/c)]
@@ -83,7 +86,8 @@
 ;;; message.
 (define (finalize-meter)
   (in-message-thread
-    (set! current-meter #f)))
+    (set! current-meter #f)
+    (set! next-meter-show-ms #f)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; We want to replace the system logger with our own so that all
