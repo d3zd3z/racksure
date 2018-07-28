@@ -7,6 +7,10 @@
 	 dynext/link
 	 racket/runtime-path)
 
+(provide scan-tree attstat
+	 (struct-out node)
+	 (struct-out dir-node))
+
 ;;; Linux interfaces to low-level file operations.
 ;;; TODO: Check dates so we don't compile every load.
 ;(compile-extension #f "c-stat.c" "cstat.o" '())
@@ -173,6 +177,9 @@
 		 (values (car kv) ((cdr kv) path sbuf))))
   (hash-set atts 'kind (car info)))
 
+(define (attstat path)
+  (portstat->attmap path (lstat path)))
+
 (struct dirent (name kind ino) #:transparent)
 
 (struct node (name atts) #:transparent)
@@ -182,26 +189,29 @@
   (hash-ref (node-atts nd) 'kind))
 
 ;; Scan a tree, building up node/dir-node structures associated with
-;; it.
+;; it.  Calls 'meter' with the nodes as they are visited.
 ;; TODO: Handle errors, warn and skip them.
-(define (scan-tree name path)
-  (define atts (portstat->attmap path (lstat path)))
+(define (scan-tree name path #:meter [meter #f])
+  (define atts (attstat path))
   (define dir? (eq? (hash-ref atts 'kind) 'dir))
-  (if dir?
-    (let ([children (sort (read-directory path) < #:key dirent-ino)]
-	  [dirs '()]
-	  [files '()])
-      (for ([child (in-list children)])
-	(define child-name (dirent-name child))
-	(define child-path (bytes-append path #"/" child-name))
-	(define nd (scan-tree child-name child-path))
-	(if (eq? (node-kind nd) 'dir)
-	  (set! dirs (cons nd dirs))
-	  (set! files (cons nd files))))
-      (dir-node name atts
-		(sort dirs bytes<? #:key node-name)
-		(sort files bytes<? #:key node-name)))
-    (node name atts)))
+  (define result
+    (if dir?
+      (let ([children (sort (read-directory path) < #:key dirent-ino)]
+	    [dirs '()]
+	    [files '()])
+	(for ([child (in-list children)])
+	  (define child-name (dirent-name child))
+	  (define child-path (bytes-append path #"/" child-name))
+	  (define nd (scan-tree child-name child-path #:meter meter))
+	  (if (eq? (node-kind nd) 'dir)
+	    (set! dirs (cons nd dirs))
+	    (set! files (cons nd files))))
+	(dir-node name atts
+		  (sort dirs bytes<? #:key node-name)
+		  (sort files bytes<? #:key node-name)))
+      (node name atts)))
+  (when meter (meter result))
+  result)
 
 (define (read-directory path)
   (define dirp (portable_opendir path))
