@@ -1,13 +1,20 @@
-#lang racket
+#lang racket/base
 
-(provide humanize-bytes)
+(require racket/format
+	 racket/contract)
+
+(provide
+  (contract-out
+    ;;; Return a string representing the byte size in a human-friendly
+    ;;; form.
+    (humanize-bytes [-> real? string?])))
 
 ;;; Humanize a byte size.
 (define prefixes '("  " "Ki" "Mi" "Gi" "Ti" "Pi" "Ei" "Zi" "Yi"))
 
 (define (humanize-bytes size)
   (let loop ([pre prefixes]
-	     [size (exact->inexact size)])
+	     [size size])
     (if (< size 1024)
       (format "~a~aB" (~r size
 			  #:precision (list '= (precision size))

@@ -1,8 +1,14 @@
-#lang racket
+#lang racket/base
 
-(provide update-meter
-	 finalize-meter
-	 meter-update-interval)
+(require racket/contract)
+
+(provide
+  (contract-out
+    [update-meter (->* [string?] [#:force boolean?] #:rest any/c any/c)]
+    [meter-update-interval
+      (case-> (-> real? void?)
+	      (-> real?))]
+    [finalize-meter (-> any/c)]))
 
 ;;; A progress meter that interacts nicely with the logging system.
 
