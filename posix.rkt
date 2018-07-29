@@ -9,7 +9,9 @@
 
 (provide scan-tree attstat
 	 (struct-out node)
-	 (struct-out dir-node))
+	 (struct-out dir-node)
+
+	 sha1-file)
 
 ;;; Linux interfaces to low-level file operations.
 ;;; TODO: Check dates so we don't compile every load.
@@ -33,7 +35,8 @@
 	(eprintf "result ~a~%" result)
 	(unless result
 	  (error "Error running compilation: ~a" args))))
-    (safe-run gcc "-O2" "-fpic" "-shared" "-o" c-stat-so c-stat-source)))
+    (safe-run gcc "-O2" "-fpic" "-shared" "-o" c-stat-so c-stat-source
+	      "-lcrypto")))
 
 ;  gcc -O2 -fpic -c c-stat.c
 ;  gcc -fpic -shared -o libcstat.so c-stat.o
@@ -251,3 +254,16 @@
     [(#\d) 'dir]
     [(#\.) 'nondir]
     [else 'unknown]))
+
+;;; C utility for getting file hashes.
+(define-cstat sha1_file_contents
+	      (_fun #:save-errno 'posix
+		    _bytes _bytes
+		    -> _int))
+
+(define (sha1-file path)
+  (define buf (make-bytes 20))
+  (define r (sha1_file_contents path buf))
+  (unless (zero? r)
+    (error "Unable to sha1 hash file" path (saved-errno)))
+  buf)

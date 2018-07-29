@@ -1,6 +1,7 @@
 #lang racket
 
-(provide estimator%)
+(provide estimator%
+	 update-hashes)
 
 (require "posix.rkt"
 	 "humanize.rkt"
@@ -34,6 +35,12 @@
        (not (hash-has-key? atts 'sha1))
        (hash-ref atts 'size)))
 
+;;; Return the size of the node in bytes, zero if it doesn't have a
+;;; size.
+(define (node-size node)
+  (define atts (node-atts node))
+  (hash-ref atts 'size (lambda () 0)))
+
 (define (percentage cur total)
   (~r (* (/ cur total) 100)
       #:min-width 5
@@ -51,7 +58,7 @@
     (define cur-files 0)
     (define cur-bytes 0)
 
-    (define/public (update)
+    (define/public (update #:force [frc #f])
       (update-meter "~a/~a (~a%) files, ~a/~a (~a%) bytes\n"
 		    (~r cur-files #:min-width 7)
 		    (~r total-files #:min-width 7)
@@ -59,4 +66,37 @@
 		    (humanize-bytes cur-bytes)
 		    (humanize-bytes total-bytes)
 		    (percentage cur-bytes total-bytes)))
+
+    (define/public (add-file octets)
+      (set! cur-files (add1 cur-files))
+      (set! cur-bytes (+ cur-bytes octets))
+      (update))
     ))
+
+;;; Given a tree, walk it, updating all of the file nodes that need
+;;; hashes with ones that have hashes.
+(define (update-hashes path tree)
+  (define est (new estimator% [tree tree]))
+
+  (define (walk path tree)
+    (for ([subdir (in-list (dir-node-dirs tree))])
+      (define sub-name (bytes-append path #"/" (node-name subdir)))
+      (walk sub-name subdir))
+
+    (define new-files
+      (for/list ([subfile (in-list (dir-node-files tree))])
+	(if (need-hash? subfile)
+	  (let ()
+	    (define sub-name (bytes-append path #"/" (node-name subfile)))
+	    (define sha1 (sha1-file sub-name))
+	    (send est add-file (node-size subfile))
+	    (define old-atts (node-atts subfile))
+	    (define new-atts (hash-set old-atts 'sha1 sha1))
+	    (struct-copy node subfile [atts new-atts]))
+	  subfile)))
+    (struct-copy dir-node tree [files new-files]))
+
+  (define new-tree (walk path tree))
+  (send est update #:force #t)
+  (finalize-meter)
+  new-tree)

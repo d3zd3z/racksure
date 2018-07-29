@@ -1,15 +1,25 @@
 /* Use the stat call, but in a portable output format. */
 
+/* Make sure we use 64 bit offsets on 32-bit platforms. */
 #define _FILE_OFFSET_BITS 64
+
+/* Needed to get O_NOATIME on Linux */
+#define _GNU_SOURCE
 
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <dirent.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
+
+#include <openssl/sha.h>
+
+#define HASH_BUF_SIZE 65535
 
 struct portstat {
 	int64_t dev;
@@ -122,4 +132,59 @@ int portable_readdir(DIR *dirp, struct portdirent *pent)
 	} else {
 		return -1;
 	}
+}
+
+/* Make sure we get an error if noatime isn't found on Linux. */
+#if !defined(__linux__) && !defined(O_NOATIME)
+#  define O_NOATIME 0
+#endif
+
+/*
+ * Read the contents of the given file, computing its sha1 hash,
+ * storing the result in 'out'.  Returns 0 on success, or -1 and sets
+ * errno on an error.
+ */
+int sha1_file_contents(const char *name, unsigned char *out)
+{
+	/* Try to open with no-atime, and if that fails, use a regular
+	 * open. */
+	int fd = open(name, O_RDONLY | O_NOATIME);
+	if (fd < 0) {
+		fd = open(name, O_RDONLY);
+	}
+	if (fd < 0) {
+		return fd;
+	}
+
+	/* TODO: Determine if lots of allocate and free here is a
+	 * performance issue. */
+	unsigned char *buf = malloc(HASH_BUF_SIZE);
+	if (buf == NULL) {
+		(void)close(fd);
+		errno = ENOMEM;
+		return -1;
+	}
+
+	SHA_CTX ctx;
+	SHA1_Init(&ctx);
+
+	while (1) {
+		int res = read(fd, buf, HASH_BUF_SIZE);
+		if (res == 0) {
+			break;
+		}
+		if (res < 0) {
+			free(buf);
+			(void)close(fd);
+			return res;
+		}
+
+		SHA1_Update(&ctx, buf, res);
+	}
+
+	free(buf);
+	(void)close(fd);
+
+	SHA1_Final(out, &ctx);
+	return 0;
 }
