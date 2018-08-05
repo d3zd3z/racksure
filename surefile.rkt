@@ -67,23 +67,26 @@
 (module+ main
   (require "estimate.rkt"
 	   file/gzip)
-  (define path #"/home/davidb/wd")
-  (define tree (metered-scan path))
-  ; (define est (new estimator% [tree tree]))
-  ; (send est update)
-  ; (build-estimate (metered-scan #"/home/davidb/wd/racksure"))
-  (define new-tree (update-hashes path tree))
+  (define (run)
+    (define path #"/home/davidb/wd")
+    (define tree (metered-scan path))
+    ; (define est (new estimator% [tree tree]))
+    ; (send est update)
+    ; (build-estimate (metered-scan #"/home/davidb/wd/racksure"))
+    (define new-tree (update-hashes path tree))
 
-  (call-with-output-file
-    "sample.dat.gz"
-    (lambda (out)
-      (define done (make-channel))
-      (define-values (zin zout) (make-pipe))
-      (thread (lambda ()
-		(gzip-through-ports zin out "sample.dat"
-				    (current-seconds))
-		(channel-put done #f)))
-      (save-sure new-tree zout)
-      (close-output-port zout)
-      (channel-get done)))
+    (call-with-output-file
+      "sample.dat.gz"
+      (lambda (out)
+	(define done (make-channel))
+	(define-values (zin zout) (make-pipe))
+	(thread (lambda ()
+		  (gzip-through-ports zin out "sample.dat"
+				      (current-seconds))
+		  (channel-put done #f)))
+	(save-sure new-tree zout)
+	(close-output-port zout)
+	(channel-get done))))
+
+  (time (run))
   )

@@ -1,0 +1,121 @@
+#lang racket
+
+(require "naming.rkt"
+         "parse.rkt"
+         json
+         gregor)
+
+(provide (struct-out delta)
+         call-with-first-delta
+         call-with-update-delta)
+
+;;; tags should be a hasheq from symbols to strings.  Time is a "moment".
+(struct delta (number name tags time) #:transparent)
+
+;;; Construct a new delta, filling in the time field.
+(define (make-delta number name tags)
+  (delta number name tags (now/moment/utc)))
+
+;;; Convert a list of deltas into a json representation.
+(define (encode-deltas dlts)
+  (define (encode-delta dlt)
+    (hasheq 'number (delta-number dlt)
+            'name (delta-name dlt)
+            'tags (delta-tags dlt)
+            'time (moment->iso8601 (delta-time dlt))))
+  (define js
+    (hasheq 'version 1
+            'deltas (map encode-delta dlts)))
+  (jsexpr->string js))
+
+(define (decode-deltas text)
+  (define top (string->jsexpr text))
+  (unless (eqv? (hash-ref top 'version) 1)
+    (error "Invalid delta descriptor version"))
+  (define (decode-delta js)
+    (delta (hash-ref js 'number)
+           (hash-ref js 'name)
+           (hash-ref js 'tags)
+           (iso8601->moment (hash-ref js 'time))))
+  (map decode-delta (hash-ref top 'deltas)))
+
+;;; Return the highest delta in a delta list.
+(define (highest-delta dlts)
+  (foldl max 0 (map delta-number dlts)))
+
+;;; Given a list of existing deltas, return a new list adding a particular new delta.
+(define (add-delta dlts name tags)
+  (append dlts (list (make-delta (add1 (highest-delta dlts)) name tags))))
+
+;;; Read the header of the weave file, which must be the first line.
+(define (read-weave-header input)
+  (define line (read-line input))
+  (unless (regexp-match #rx"^\1t" line)
+    (error "Weave file does not start with proper header"))
+  (decode-deltas (substring line 2)))
+
+;;; A line-based writer of the initial delta.  Calls proc with a single argument which is a function
+;;; that can be called for each string to be added to the weave.
+;;; Write the first delta.  Given a naming convention, calls 'proc' with a port it can write to to
+;;; store the first delta.
+(define (call-with-first-delta nm name tags proc)
+  (call-with-temp-rename-to nm
+    (lambda (_ out)
+      (define header (add-delta null name tags))
+      (fprintf out "\1t~a~%" (encode-deltas header))
+      (displayln "\1I 1" out)
+      (proc out)
+      (displayln "\1E 1" out))))
+
+;;; Update a given delta.  Will call 'proc' with output sent to a temporary file where it can write
+;;; the new version.
+(define (call-with-update-delta nm name tags proc)
+  (define header (call-with-main-in nm read-weave-header))
+
+  (define last-delta (highest-delta header))
+
+  ;; Start by copying out the previous revision.
+  ;; TODO: This needs to not just be hardcoded to 1.
+  (call-with-temp-file nm
+    (lambda (tname out)
+      (call-with-main-in nm
+        (lambda (in)
+          ((make-weave-parser in (new weave-write-sink% [out-port out]) last-delta) 0)
+          (close-output-port out)))
+      ;; (system* "/bin/ls" "-l")
+      ;; (system* "/bin/cp" tname "hahafofo")
+
+      ;; Run the user operation to a new temporary file.
+      (call-with-temp-file
+        nm
+        (lambda (new-temp-name new-out)
+          (proc new-out)
+          (close-output-port new-out)
+
+          ;; Now we can run 'diff on these'.  For now, read to a string, but it'd be nice to be able
+          ;; to do this differently.
+          (define diffs
+            (with-output-to-bytes
+              (thunk
+                ;; Diff has a weird exit status: 0 same, 1 diffs, and 2 if trouble.  We only want to
+                ;; abort in the case of '2'.
+                (define status
+                  (system*/exit-code "/usr/bin/diff" tname new-temp-name))
+                (fprintf (current-error-port) "status: ~A~%" status)
+                (unless (< status 2)
+                  (error "Unable to run diff")))))
+
+          (printf "Diff is ~a bytes~%" (bytes-length diffs)))))))
+
+(module+ main
+  (define *test-naming* (naming "." "sample" "dat" #t))
+
+  ;;; Try a simple test
+  (call-with-first-delta
+    *test-naming* "First delta" (hasheq 'type "testing")
+    (lambda (out)
+      (displayln "asure-2.0" out)
+      (displayln "-----" out)
+      (displayln "d__root__ [gid 0 kind dir perm 493 uid 0 ]" out)
+      (displayln "-" out)
+      (displayln "u" out))))
