@@ -8,7 +8,8 @@
 
 (provide (struct-out delta)
          call-with-first-delta
-         call-with-update-delta)
+         call-with-update-delta
+         read-delta)
 
 ;;; tags should be a hasheq from symbols to strings.  Time is a "moment".
 (struct delta (number name tags time) #:transparent)
@@ -93,7 +94,15 @@
         (close-output-port diff-out)
         ))
 
-    (system* "/bin/ls" "-l" diff-name)))
+    ;; Using the diff, write the updated delta.
+    (call (call-with-temp-rename-to nm) (_ out)
+      (define new-header (add-delta header name tags))
+      (fprintf out "\1t~a~%" (encode-deltas new-header))
+      (call (call-with-main-in nm) (main-in)
+        (call (call-with-input-file diff-name) (diff-in)
+          (write-delta main-in diff-in out last-delta (add1 last-delta)))))
+    ;(system* "/bin/ls" "-l" diff-name)
+    ))
 
 ;;; Run diffs on two filenames, returning the diff output as a single string.
 (define (run-diff out-port name-1 name-2)
@@ -104,6 +113,65 @@
       (system*/exit-code "/usr/bin/diff" name-1 name-2))
     (unless (< status 2)
       (error "Unable to run diff"))))
+
+;;; Given a reader over the previous weave file, over the output of diff, and a writer for the new
+;;; weave file, generate a new weave file containing the new delta.
+(define (write-delta main-in diff-in out last-delta new-delta)
+  (define sink (new weave-write-all-sink% [out-port out]))
+  (define parser (make-weave-parser main-in sink last-delta))
+  (define adding? #f)
+  (define done? #f)
+  (for ([line (in-lines diff-in)])
+    (match line
+      ;; Diff control line.
+      [(regexp #px"^(\\d+)(,(\\d+))?([acd]).*$" (list _ a _ b cmd))
+       (when adding?
+         (send sink end new-delta)
+         (set! adding? #f))
+       (define left (string->number a))
+       (define right (if b (string->number b) left))
+       (case cmd
+         ;; These have deletions.
+         [("d" "c")
+          (parser left)
+          (send sink delete new-delta)
+          (when (eof-object? (parser (add1 right)))
+            (set! done? #t))
+          (send sink end new-delta)]
+         [else
+           (when (eof-object? (parser (add1 right)))
+             (set! done? #t))])
+       ;; Check for additions.
+       (case cmd
+         [("c" "a")
+          (send sink insert new-delta)
+          (set! adding? #t)])]
+      ;; Removed or separator line, ignore.
+      [(regexp #px"^[<-].*") (void)]
+      [(regexp #px"^> (.*)$" (list _ text))
+       (send sink plain text #t)]
+      [else (error "Unexpected diff line" line)]))
+  (when adding?
+    (send sink end new-delta))
+
+  ;; Anything remaining should be processed.
+  (unless done?
+    (parser 0)))
+
+(define read-sink%
+  (class weave-sink%
+    (init proc)
+    (super-new)
+    (define -proc proc)
+    (define/override (plain text keep)
+      (when keep
+        (-proc text)))))
+
+;;; Read a given delta.  Calls 'proc' with each line from the delta.
+(define (read-delta nm delta proc)
+  (define sink (new read-sink% [proc proc]))
+  (call (call-with-main-in nm) (main-in)
+    ((make-weave-parser main-in sink delta) 0)))
 
 (module+ main
   (define *test-naming* (naming "." "sample" "dat" #t))
