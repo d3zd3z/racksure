@@ -108,7 +108,12 @@
         (let ()
           (define-values (zin zout) (make-pipe))
           (thread (lambda ()
-                    (gunzip-through-ports in zout)
+                    ;; There is a race between closing zout before the input is consumed, and the
+                    ;; gzip thread trying to read from it.  This just raises an 'exn:fail', which
+                    ;; isn't helpful to distinguish from other errors, but it is somewhat verbose
+                    ;; and confusing if this isn't caught.
+                    (with-handlers ([exn:fail?  (lambda (_) (void))])
+                      (gunzip-through-ports in zout))
                     (close-output-port zout)))
           (proc zin))
         (proc in)))))
