@@ -1,6 +1,7 @@
 #lang racket
 
-(require "naming.rkt"
+(require "call.rkt"
+         "naming.rkt"
          "parse.rkt"
          json
          gregor)
@@ -59,13 +60,12 @@
 ;;; Write the first delta.  Given a naming convention, calls 'proc' with a port it can write to to
 ;;; store the first delta.
 (define (call-with-first-delta nm name tags proc)
-  (call-with-temp-rename-to nm
-    (lambda (_ out)
-      (define header (add-delta null name tags))
-      (fprintf out "\1t~a~%" (encode-deltas header))
-      (displayln "\1I 1" out)
-      (proc out)
-      (displayln "\1E 1" out))))
+  (call (call-with-temp-rename-to nm) (_ out)
+    (define header (add-delta null name tags))
+    (fprintf out "\1t~a~%" (encode-deltas header))
+    (displayln "\1I 1" out)
+    (proc out)
+    (displayln "\1E 1" out)))
 
 ;;; Update a given delta.  Will call 'proc' with output sent to a temporary file where it can write
 ;;; the new version.
@@ -74,38 +74,36 @@
 
   (define last-delta (highest-delta header))
 
-  ;; Start by copying out the previous revision.
-  ;; TODO: This needs to not just be hardcoded to 1.
-  (call-with-temp-file nm
-    (lambda (tname out)
-      (call-with-main-in nm
-        (lambda (in)
-          ((make-weave-parser in (new weave-write-sink% [out-port out]) last-delta) 0)
-          (close-output-port out)))
+  (call (call-with-temp-file nm) (diff-name diff-out)
+    (call (call-with-temp-file nm) (tname out)
+      (call (call-with-main-in nm) (in)
+        ((make-weave-parser in (new weave-write-sink% [out-port out]) last-delta) 0)
+        (close-output-port out))
       ;; (system* "/bin/ls" "-l")
       ;; (system* "/bin/cp" tname "hahafofo")
 
       ;; Run the user operation to a new temporary file.
-      (call-with-temp-file
-        nm
-        (lambda (new-temp-name new-out)
-          (proc new-out)
-          (close-output-port new-out)
+      (call (call-with-temp-file nm) (new-temp-name new-out)
+        (proc new-out)
+        (close-output-port new-out)
 
-          ;; Now we can run 'diff on these'.  For now, read to a string, but it'd be nice to be able
-          ;; to do this differently.
-          (define diffs
-            (with-output-to-bytes
-              (thunk
-                ;; Diff has a weird exit status: 0 same, 1 diffs, and 2 if trouble.  We only want to
-                ;; abort in the case of '2'.
-                (define status
-                  (system*/exit-code "/usr/bin/diff" tname new-temp-name))
-                (fprintf (current-error-port) "status: ~A~%" status)
-                (unless (< status 2)
-                  (error "Unable to run diff")))))
+        ;; Now we can run 'diff on these'.  For now, read to a string, but it'd be nice to be able
+        ;; to do this differently.
+        (run-diff diff-out tname new-temp-name)
+        (close-output-port diff-out)
+        ))
 
-          (printf "Diff is ~a bytes~%" (bytes-length diffs)))))))
+    (system* "/bin/ls" "-l" diff-name)))
+
+;;; Run diffs on two filenames, returning the diff output as a single string.
+(define (run-diff out-port name-1 name-2)
+  (parameterize ([current-output-port out-port])
+    ;; Diff has a weird exit status: 0 same, 1 diffs, and 2 if trouble.  We only want to
+    ;; abort in the case of '2'.
+    (define status
+      (system*/exit-code "/usr/bin/diff" name-1 name-2))
+    (unless (< status 2)
+      (error "Unable to run diff"))))
 
 (module+ main
   (define *test-naming* (naming "." "sample" "dat" #t))

@@ -7,6 +7,7 @@
 
 (provide weave-sink%
          weave-write-sink%
+         weave-write-all-sink%
          make-weave-parser)
 
 ;;; This base object implements the methods to handle all of the events, and ignore them.
@@ -30,6 +31,21 @@
     (define/override (plain text keep)
       (when keep
         (displayln text -out-port)))))
+
+(define weave-write-all-sink%
+  (class weave-sink%
+    (init out-port)
+    (define -out-port out-port)
+    (super-new)
+
+    (define/override (insert delta)
+      (fprintf -out-port "\1I ~a~%" delta))
+    (define/override (delete delta)
+      (fprintf -out-port "\1D ~a~%" delta))
+    (define/override (end delta)
+      (fprintf -out-port "\1E ~a~%" delta))
+    (define/override (plain text keep)
+      (displayln text -out-port))))
 
 ;;; The parser takes in input-port, a weave-sink% and a delta number to extract.  It returns a
 ;;; function that can parse up to a given line number.  The lines are numbered starting at one, so

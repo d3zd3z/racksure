@@ -1,6 +1,7 @@
 #lang racket
 
-(require "weave.rkt"
+(require "call.rkt"
+         "weave.rkt"
          "naming.rkt")
 
 ;;; Perform a somewhat random modification of the data.  Choose some range of the items and reverse
@@ -27,15 +28,11 @@
 (define (test-it)
   (define nn (naming "." "sample" "dat" #t))
   (define delta1 (range 100))
-  (call-with-first-delta
-    nn "first-delta" (hasheq 'type "testing")
-    (lambda (out)
-      (write-items delta1 out)))
+  (call (call-with-first-delta nn "first-delta" (hasheq 'type "testing")) (out)
+    (write-items delta1 out))
   (define delta2 (mutate delta1))
-  (call-with-update-delta
-    nn "second-delta" (hasheq 'type "testing2")
-    (lambda (out)
-      (write-items delta2 out))))
+  (call (call-with-update-delta nn "second-delta" (hasheq 'type "testing2")) (out)
+    (write-items delta2 out)))
 
 (module+ main
   (test-it))
