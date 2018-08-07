@@ -9,7 +9,10 @@
 (provide (struct-out delta)
          call-with-first-delta
          call-with-update-delta
-         read-delta)
+         read-delta
+
+         ;;; Reprovide a few things from other modules so clients only need weave.rkt itself.
+         (all-from-out "naming.rkt"))
 
 ;;; tags should be a hasheq from symbols to strings.  Time is a "moment".
 (struct delta (number name tags time) #:transparent)

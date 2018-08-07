@@ -6,7 +6,9 @@
 	 "humanize.rkt"
 	 "posix.rkt"
 	 "attmap.rkt"
-	 "meter.rkt")
+	 "meter.rkt"
+         "weave/call.rkt"
+         "weave/weave.rkt")
 
 ;;; Perform a scan of a directory, with a progress meter.
 (define (metered-scan path)
@@ -75,18 +77,17 @@
     ; (build-estimate (metered-scan #"/home/davidb/wd/racksure"))
     (define new-tree (update-hashes path tree))
 
-    (call-with-output-file
-      "sample.dat.gz"
-      (lambda (out)
-	(define done (make-channel))
-	(define-values (zin zout) (make-pipe))
-	(thread (lambda ()
-		  (gzip-through-ports zin out "sample.dat"
-				      (current-seconds))
-		  (channel-put done #f)))
-	(save-sure new-tree zout)
-	(close-output-port zout)
-	(channel-get done))))
+    (define nn (naming "." "sample" "dat" #t))
+    (call (call-with-first-delta nn "first-delta" (hasheq 'type "testing")) (out)
+      (save-sure new-tree out))
+
+    ;; Rescan, TODO: Do update here.
+    (define tree2a (metered-scan path))
+    (define tree2b (update-hashes path tree2a))
+
+    (call (call-with-update-delta nn "second-delta" (hasheq 'type "testing2")) (out)
+      (save-sure tree2b out))
+    )
 
   (time (run))
   )

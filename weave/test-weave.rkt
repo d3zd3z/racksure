@@ -1,8 +1,7 @@
 #lang racket
 
 (require "call.rkt"
-         "weave.rkt"
-         "naming.rkt")
+         "weave.rkt")
 
 ;;; Perform a somewhat random modification of the data.  Choose some range of the items and reverse
 ;;; them.
@@ -26,15 +25,17 @@
     (displayln item port)))
 
 (define (test-it)
+  (define total 300)
+  (define lines 100)
   (define nn (naming "." "sample" "dat" #t))
   (define deltas null)
-  (define delta1 (range 100))
+  (define delta1 (range lines))
   (set! deltas (cons delta1 deltas))
   (call (call-with-first-delta nn "first-delta" (hasheq 'type "testing")) (out)
     (write-items delta1 out))
-  (define total 300)
   (printf "Writing ~a deltas~%" total)
   (for ([i (in-range 2 (add1 total))])
+    ; (printf "  ... ~A~%" i)
     (define delta2 (mutate delta1))
     (define name (format "delta #~a" i))
     (call (call-with-update-delta nn name (hasheq 'type "testing2")) (out)
@@ -61,4 +62,7 @@
     (error "Delta mismatch on delta" delta)))
 
 (module+ main
+  (test-it))
+
+(module+ test
   (test-it))
