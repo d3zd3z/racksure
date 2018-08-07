@@ -170,11 +170,24 @@
       (when keep
         (-proc text)))))
 
-;;; Read a given delta.  Calls 'proc' with each line from the delta.
+;;; Lookup a delta number
+(define (lookup-delta nm delta)
+  (cond [(positive? delta) delta]
+        [(zero? delta) (error "Zero is not a valid delta")]
+        [(negative? delta)
+         (define raw-header (call-with-main-in nm read-weave-header))
+         (define header (sort raw-header > #:key delta-number))
+         (delta-number (list-ref header (- -1 delta)))]
+        [else (error "Delta is not a number")]))
+
+;;; Read a given delta.  Calls 'proc' with each line from the delta.  The delta number is either a
+;;; positive integer for a direct delta, or a negative number, with -1 indicating the last delta, -2
+;;; the prior one, etc.
 (define (read-delta nm delta proc)
+  (define delta-num (lookup-delta nm delta))
   (define sink (new read-sink% [proc proc]))
   (call (call-with-main-in nm) (main-in)
-    ((make-weave-parser main-in sink delta) 0)))
+    ((make-weave-parser main-in sink delta-num) 0)))
 
 (module+ main
   (define *test-naming* (naming "." "sample" "dat" #t))
