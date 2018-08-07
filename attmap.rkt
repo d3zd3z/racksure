@@ -34,7 +34,7 @@
       [(cons _ (? symbol? item))
        (display item out)]
       [(cons 'sha1 (? bytes? item))
-       (display (bytes->hex-string item))]
+       (display (bytes->hex-string item) out)]
       [(cons 'targ (? bytes? item))
        (display (escape item) out)]
       [item
