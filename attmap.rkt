@@ -12,9 +12,11 @@
 (require parser-tools/lex
 	 (prefix-in : parser-tools/lex-sre)
 	 "escape.rkt"
+         "posix.rkt"
 	 (only-in file/sha1 bytes->hex-string hex-string->bytes))
 
-(provide attmap->bytes)
+(provide attmap->bytes
+         decode-line)
 
 (module+ test
   (require rackunit))
@@ -64,7 +66,7 @@
     [#\d 'dir]
     [#\- 'sep]
     [#\u 'up]
-    [#\u 'file]))
+    [#\f 'file]))
 
 (define rest-lex
   (lexer
@@ -74,6 +76,46 @@
     ["]"   'end]
     [" "   'space]
     [(:+ (:~ #\[ #\] #\space #\newline))  lexeme]))
+
+;;; Parse a line from the input.  Will return one of the following forms:
+;;; (cons 'dir node?)
+;;; (cons 'file node?)
+;;; 'sep
+;;; 'up
+;;; or eof-object?
+(define (decode-line line)
+  (define in (open-input-string line))
+  (define (expect token)
+    (define tok (rest-lex in))
+    (unless (eq? tok token)
+      (error "Unexpected token" tok token)))
+  (define (decode-atts)
+    (let loop ([result (hasheq)])
+      (define key (rest-lex in))
+      (cond [(eq? key 'end)
+             result]
+            [(string? key)
+             (define key-sym (string->symbol key))
+             (expect 'space)
+             (define value (rest-lex in))
+             (unless (string? value)
+               (error "Expecting string" value))
+             (expect 'space)
+             (define val-value ((hash-ref val-kinds key-sym
+                                          (lambda ()
+                                            (error "Unknown att key" key-sym)))
+                                value))
+             (loop (hash-set result key-sym val-value))]
+            [else (error "Unexpected token" key)])))
+  (match (bol-lex in)
+    [(and value (or 'dir 'file))
+     (define name (rest-lex in))
+     (expect 'space)
+     (expect 'begin)
+     (define atts (decode-atts))
+     (cons value (node (unescape (string->bytes/utf-8 name)) atts))]
+    [item
+      item]))
 
 (define val-kinds
   (hasheq
@@ -87,7 +129,9 @@
     'mtime string->number
     'atime string->number
     'kind string->symbol
-    'sha1 hex-string->bytes))
+    'sha1 hex-string->bytes
+    'targ (lambda (x)
+            (unescape (string->bytes/utf-8 x)))))
 
 (define (split-input text)
   (define in (open-input-bytes text))
