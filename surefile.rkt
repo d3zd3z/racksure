@@ -66,6 +66,57 @@
 	   (escape (node-name file))
 	   (attmap->bytes (node-atts file))))
 
+;;; Load a given delta from the naming.
+(define (load-delta nm delta)
+  (define chan (make-channel))
+  (define result-chan (make-channel))
+  (thread (thunk (build-tree chan result-chan)))
+  (define (handle line)
+    (channel-put chan line))
+  (printf "Loading delta ~V~%" delta)
+  (read-delta nm delta handle)
+  ; (channel-put chan eof)
+  (channel-get result-chan))
+
+;;; Read lines from the channel, recursively building a tree.
+(define (build-tree chan result-chan)
+  (unless (string=? (channel-get chan) "asure-2.0")
+    (error "Invalid header line in surefile"))
+  (unless (string=? (channel-get chan) "-----")
+    (error "Invalid separator line in surefile"))
+
+  ;;; Read tree, with the look-ahead already consumed.
+  (define (read-tree node)
+    (unless (eq? (car node) 'dir)
+      (error "Expecting a 'dir' node"))
+
+    ;;; Read lines until we hit a sep.
+    (define children
+      (let loop ([children null])
+        (define line (decode-line (channel-get chan)))
+        (if (eq? line 'sep)
+          (reverse children)
+          (loop (cons (read-tree line) children)))))
+
+    ;;; Then read files until 'up.
+    (define files
+      (let loop ([files null])
+        (define line (decode-line (channel-get chan)))
+        (if (eq? line 'up)
+          (reverse files)
+          (let ()
+            (unless (eq? (car line) 'file)
+              (error "Unexpected input line in surefile" line))
+            (loop (cons (cdr line) files))))))
+
+    ;; (printf "dir: ~V~%" (cdr node))
+    (dir-node (node-name (cdr node))
+              (node-atts (cdr node))
+              children
+              files))
+
+  (channel-put result-chan (read-tree (decode-line (channel-get chan)))))
+
 (module+ main
   (require "estimate.rkt"
 	   file/gzip)
@@ -89,5 +140,13 @@
       (save-sure tree2b out))
     )
 
-  (time (run))
+  (define (compare)
+    (define nn (naming "." "sample" "dat" #t))
+    (define old-tree (load-delta nn -2))
+    (define cur-tree (load-delta nn -1))
+    (values (node-name old-tree)
+            (node-name cur-tree)))
+
+  ;(time (run))
+  (compare)
   )
