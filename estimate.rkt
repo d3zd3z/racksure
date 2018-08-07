@@ -79,9 +79,10 @@
   (define est (new estimator% [tree tree]))
 
   (define (walk path tree)
-    (for ([subdir (in-list (dir-node-dirs tree))])
-      (define sub-name (bytes-append path #"/" (node-name subdir)))
-      (walk sub-name subdir))
+    (define new-dirs
+      (for/list ([subdir (in-list (dir-node-dirs tree))])
+        (define sub-name (bytes-append path #"/" (node-name subdir)))
+        (walk sub-name subdir)))
 
     (define new-files
       (for/list ([subfile (in-list (dir-node-files tree))])
@@ -94,7 +95,9 @@
 	    (define new-atts (hash-set old-atts 'sha1 sha1))
 	    (struct-copy node subfile [atts new-atts]))
 	  subfile)))
-    (struct-copy dir-node tree [files new-files]))
+    (struct-copy dir-node tree
+                 [dirs new-dirs]
+                 [files new-files]))
 
   (define new-tree (walk path tree))
   (send est update #:force #t)
