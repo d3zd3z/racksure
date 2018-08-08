@@ -145,9 +145,8 @@
     (define nn (naming "." "sample" "dat" #t))
     (define old-tree (load-delta nn -2))
     (define cur-tree (load-delta nn -1))
-    (values (node-name old-tree)
-            (node-name cur-tree)))
+    (compare-trees old-tree cur-tree))
 
-  (time (run))
-  ;(compare)
+  ;(time (run))
+  (compare)
   )
