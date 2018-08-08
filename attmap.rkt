@@ -10,11 +10,11 @@
 ;;; targ: An escaped string.
 
 (require parser-tools/lex
-	 (prefix-in : parser-tools/lex-sre)
-	 "escape.rkt"
+         (prefix-in : parser-tools/lex-sre)
+         "escape.rkt"
          "node.rkt"
          "posix.rkt"
-	 (only-in file/sha1 bytes->hex-string hex-string->bytes))
+         (only-in file/sha1 bytes->hex-string hex-string->bytes))
 
 (provide attmap->bytes
          decode-line)
@@ -41,7 +41,7 @@
       [(cons 'targ (? bytes? item))
        (display (escape item) out)]
       [item
-	(error "Unsupported attmap value" k item)])
+        (error "Unsupported attmap value" k item)])
     (display #\space out))
   (display #\] out)
   (get-output-bytes out))
@@ -141,34 +141,34 @@
       [(list-rest 'begin more) more]
       [other (error "Invalid attributes" other)]))
   (let loop ([result (hasheq)]
-	     [tokens tokens])
+             [tokens tokens])
     (match tokens
       [(list-rest (? string? key) 'space (? string? val) 'space more)
        (define key-sym (string->symbol key))
        (define value ((hash-ref val-kinds key-sym
-				(lambda ()
-				  (error "Unknown att key" key-sym)))
-		      val))
+                                (lambda ()
+                                  (error "Unknown att key" key-sym)))
+                      val))
        (loop (hash-set result key-sym value)
-	     more)]
+             more)]
       [(list 'end)
        result]
       [other
-	(error "Invalid attributes" other)])))
+        (error "Invalid attributes" other)])))
 
 (module+ test
 
   (check-equal? (split-input (bytes-append #"[uid 12345 gid 8421 ino 184672 perm 19274 size 174926 "
-					   #"rdev 197482 ctime 197186 mtime 2871974 atime 197386 "
-					   #"kind floop sha1 123456789abcdef0 ]"))
-		(hasheq 'atime 197386
-			'ctime 197186
-			'gid 8421
-			'ino 184672
-			'kind 'floop
-			'mtime 2871974
-			'perm 19274
-			'rdev 197482
-			'sha1 #"\0224Vx\232\274\336\360"
-			'size 174926
-			'uid 12345)))
+                                           #"rdev 197482 ctime 197186 mtime 2871974 atime 197386 "
+                                           #"kind floop sha1 123456789abcdef0 ]"))
+                (hasheq 'atime 197386
+                        'ctime 197186
+                        'gid 8421
+                        'ino 184672
+                        'kind 'floop
+                        'mtime 2871974
+                        'perm 19274
+                        'rdev 197482
+                        'sha1 #"\0224Vx\232\274\336\360"
+                        'size 174926
+                        'uid 12345)))

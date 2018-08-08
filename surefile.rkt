@@ -3,10 +3,10 @@
 ;;; Processing surefiles.
 
 (require "escape.rkt"
-	 "humanize.rkt"
-	 "posix.rkt"
-	 "attmap.rkt"
-	 "meter.rkt"
+         "humanize.rkt"
+         "posix.rkt"
+         "attmap.rkt"
+         "meter.rkt"
          "node.rkt"
          "weave/call.rkt"
          "weave/weave.rkt")
@@ -23,11 +23,11 @@
       #:force forced))
   (define (update node)
     (cond [(dir-node? node)
-	   (set! dirs (add1 dirs))]
-	  [else
-	    (set! files (add1 files))
-	    (set! octets (+ octets
-			    (or (node-size node) 0)))])
+           (set! dirs (add1 dirs))]
+          [else
+            (set! files (add1 files))
+            (set! octets (+ octets
+                            (or (node-size node) 0)))])
     (show #f))
   (define result (scan-tree #"__root__" path #:meter update))
   (show #t)
@@ -37,8 +37,8 @@
 ;;; Maybe should be in posix?
 (define (node-size node)
   (hash-ref (node-atts node)
-	    'size
-	    (lambda () #f)))
+            'size
+            (lambda () #f)))
 
 (define (scan-and-save path [output (current-output-port)])
   (define tree (scan-tree #"__root__" path))
@@ -53,8 +53,8 @@
   (unless (dir-node? tree)
     (error "Path given was not a directory"))
   (fprintf output "d~a ~a~%"
-	   (escape (node-name tree))
-	   (attmap->bytes (node-atts tree)))
+           (escape (node-name tree))
+           (attmap->bytes (node-atts tree)))
   (for ([dir (in-list (dir-node-dirs tree))])
     (walk-dir dir output))
   (fprintf output "-\n")
@@ -64,8 +64,8 @@
 
 (define (walk-file file output)
   (fprintf output "f~a ~a~%"
-	   (escape (node-name file))
-	   (attmap->bytes (node-atts file))))
+           (escape (node-name file))
+           (attmap->bytes (node-atts file))))
 
 ;;; Load a given delta from the naming.
 (define (load-delta nm delta)
@@ -120,7 +120,7 @@
 
 (module+ main
   (require "estimate.rkt"
-	   file/gzip)
+           file/gzip)
   (define (run)
     (define path #"/home/davidb/wd")
     (define tree (metered-scan path))
@@ -148,6 +148,6 @@
     (values (node-name old-tree)
             (node-name cur-tree)))
 
-  ;(time (run))
-  (compare)
+  (time (run))
+  ;(compare)
   )

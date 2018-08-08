@@ -10,7 +10,7 @@
     [update-meter (->* [string?] [#:force boolean?] #:rest any/c any/c)]
     [meter-update-interval
       (case-> (-> real? void?)
-	      (-> real?))]
+              (-> real?))]
     [finalize-meter (-> any/c)]))
 
 ;;; A progress meter that interacts nicely with the logging system.
@@ -33,8 +33,8 @@
 ;;; the action is actually run.
 (define-syntax-rule (in-message-thread body ...)
   (channel-put message-channel
-	       (lambda ()
-		 body ...)))
+               (lambda ()
+                 body ...)))
 
 ;;; Channel messages are procedures that perform the channel action,
 ;;; in the context of the messaging thread.
@@ -42,8 +42,8 @@
   (thread
     (lambda ()
       (let loop ()
-	((channel-get message-channel))
-	(loop)))))
+        ((channel-get message-channel))
+        (loop)))))
 
 ;;; Clear the currently printed meter.
 (define (clear-meter)
@@ -76,11 +76,11 @@
 (define (update-meter form #:force [frc #f] . v)
   (in-message-thread
     (when (or frc (>= (current-inexact-milliseconds) 
-		      (or next-meter-show-ms 0)))
+                      (or next-meter-show-ms 0)))
       (clear-meter)
       (show-meter (apply format form v))
       (set! next-meter-show-ms (+ (current-inexact-milliseconds)
-				  (meter-update-interval))))))
+                                  (meter-update-interval))))))
 
 ;;; Finalize the meter. Does not clear, just marks that there is no
 ;;; message.
@@ -104,9 +104,9 @@
   (thread
     (lambda ()
       (let loop ()
-	(define evt (sync recv))
-	(show-log-message evt)
-	(loop)))))
+        (define evt (sync recv))
+        (show-log-message evt)
+        (loop)))))
 
 (define logging-thread (setup-logging))
 

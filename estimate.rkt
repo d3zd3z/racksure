@@ -1,12 +1,12 @@
 #lang racket
 
 (provide estimator%
-	 update-hashes)
+         update-hashes)
 
 (require "posix.rkt"
-	 "humanize.rkt"
+         "humanize.rkt"
          "node.rkt"
-	 "meter.rkt")
+         "meter.rkt")
 
 ;;; Walk a node tree, accumulating file and size counts in the tree.
 (define (build-estimate tree)
@@ -61,12 +61,12 @@
 
     (define/public (update #:force [frc #f])
       (update-meter "~a/~a (~a%) files, ~a/~a (~a%) bytes\n"
-		    (~r cur-files #:min-width 7)
-		    (~r total-files #:min-width 7)
-		    (percentage cur-files total-files)
-		    (humanize-bytes cur-bytes)
-		    (humanize-bytes total-bytes)
-		    (percentage cur-bytes total-bytes)))
+                    (~r cur-files #:min-width 7)
+                    (~r total-files #:min-width 7)
+                    (percentage cur-files total-files)
+                    (humanize-bytes cur-bytes)
+                    (humanize-bytes total-bytes)
+                    (percentage cur-bytes total-bytes)))
 
     (define/public (add-file octets)
       (set! cur-files (add1 cur-files))
@@ -87,15 +87,15 @@
 
     (define new-files
       (for/list ([subfile (in-list (dir-node-files tree))])
-	(if (need-hash? subfile)
-	  (let ()
-	    (define sub-name (bytes-append path #"/" (node-name subfile)))
-	    (define sha1 (sha1-file sub-name))
-	    (send est add-file (node-size subfile))
-	    (define old-atts (node-atts subfile))
-	    (define new-atts (hash-set old-atts 'sha1 sha1))
-	    (struct-copy node subfile [atts new-atts]))
-	  subfile)))
+        (if (need-hash? subfile)
+          (let ()
+            (define sub-name (bytes-append path #"/" (node-name subfile)))
+            (define sha1 (sha1-file sub-name))
+            (send est add-file (node-size subfile))
+            (define old-atts (node-atts subfile))
+            (define new-atts (hash-set old-atts 'sha1 sha1))
+            (struct-copy node subfile [atts new-atts]))
+          subfile)))
     (struct-copy dir-node tree
                  [dirs new-dirs]
                  [files new-files]))
