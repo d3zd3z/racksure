@@ -12,6 +12,7 @@
 (require parser-tools/lex
 	 (prefix-in : parser-tools/lex-sre)
 	 "escape.rkt"
+         "node.rkt"
          "posix.rkt"
 	 (only-in file/sha1 bytes->hex-string hex-string->bytes))
 

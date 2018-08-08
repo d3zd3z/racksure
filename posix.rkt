@@ -5,12 +5,10 @@
 	 ffi/unsafe/define
 	 dynext/compile
 	 dynext/link
-	 racket/runtime-path)
+	 racket/runtime-path
+         "node.rkt")
 
 (provide scan-tree attstat
-	 (struct-out node)
-	 (struct-out dir-node)
-
 	 sha1-file)
 
 ;;; Linux interfaces to low-level file operations.
@@ -184,12 +182,6 @@
   (portstat->attmap path (lstat path)))
 
 (struct dirent (name kind ino) #:transparent)
-
-(struct node (name atts) #:transparent)
-(struct dir-node node (dirs files) #:transparent)
-
-(define (node-kind nd)
-  (hash-ref (node-atts nd) 'kind))
 
 ;; Scan a tree, building up node/dir-node structures associated with
 ;; it.  Calls 'meter' with the nodes as they are visited.

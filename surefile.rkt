@@ -7,6 +7,7 @@
 	 "posix.rkt"
 	 "attmap.rkt"
 	 "meter.rkt"
+         "node.rkt"
          "weave/call.rkt"
          "weave/weave.rkt")
 

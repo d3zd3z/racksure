@@ -5,6 +5,7 @@
 
 (require "posix.rkt"
 	 "humanize.rkt"
+         "node.rkt"
 	 "meter.rkt")
 
 ;;; Walk a node tree, accumulating file and size counts in the tree.
